@@ -1,0 +1,180 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+}
+
+model Tenant {
+  id             String   @id @default(uuid())
+  name           String
+  appName        String   @default("OmniPOS")
+  logoUrl        String   @default("")
+  primaryColor   String   @default("#38bdf8")
+  secondaryColor String   @default("#818cf8")
+  themeMode      String   @default("dark")
+  staff          Staff[]
+  categories     Category[]
+  products       Product[]
+  orders         Order[]
+  tables         RestaurantTable[]
+  inventory      InventoryItem[]
+  shifts         StaffShift[]
+  notifications  Notification[]
+  customers      Customer[]
+}
+
+model Staff {
+  id           String   @id @default(uuid())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  fullName     String
+  role         String
+  username     String   @unique
+  passwordHash String
+  email        String
+  niNumber     String?
+  bankDetails  String?
+  payRate      Decimal  @default(0.00)
+  workingDays  String   @default("[]") 
+  status       String   @default("Active")
+  shifts       StaffShift[]
+  orders       Order[]
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId String
+  name     String
+  products Product[]
+}
+
+model Product {
+  id         String      @id @default(uuid())
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  tenantId   String
+  category   Category    @relation(fields: [categoryId], references: [id])
+  categoryId String
+  name       String
+  price      Decimal
+  recipes    MenuRecipe[]
+}
+
+model Order {
+  id                   String      @id @default(uuid())
+  tenant               Tenant      @relation(fields: [tenantId], references: [id])
+  tenantId             String
+  staff                Staff?      @relation(fields: [staffId], references: [id])
+  staffId              String?
+  customer             Customer?   @relation(fields: [customerId], references: [id])
+  customerId           String?
+  customerName         String
+  tableId              String
+  totalAmount          Decimal
+  status               String      @default("Pending")
+  vectorClock          String      @default("{}")
+  metadataJson         String      @default("[]")
+  pendingAmendmentsJson String     @default("[]")
+  notes                String      @default("")
+  guestCount           Int         @default(1)
+  paymentMethod        String      @default("")
+  serviceCharge        Decimal     @default(0)
+  discount             Decimal     @default(0)
+  discountType         String      @default("none")
+  finalTotal           Decimal     @default(0)
+  createdAt            DateTime    @default(now())
+  paidAt               DateTime?
+  workflowStatus       String      @default("Pending")
+  canAmend             Boolean     @default(true)
+  statusHistory        String      @default("[]")
+  discountReason       String      @default("")
+  items                OrderItem[]
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String
+  productId   String
+  quantity    Int
+  unitPrice   Decimal
+}
+
+model RestaurantTable {
+  id          String   @id @default(uuid())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId    String
+  tableNumber String
+  capacity    Int
+  status      String   @default("Available")
+  posX        Int
+  posY        Int
+}
+
+model InventoryItem {
+  id           String      @id @default(uuid())
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  name         String
+  sku          String
+  currentStock Decimal
+  minThreshold Decimal
+  unit         String      @default("units")
+  recipes      MenuRecipe[]
+}
+
+model MenuRecipe {
+  product         Product       @relation(fields: [productId], references: [id])
+  productId       String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId String
+  quantity        Decimal
+
+  @@id([productId, inventoryItemId])
+}
+
+model StaffShift {
+  id             String         @id @default(uuid())
+  staff          Staff          @relation(fields: [staffId], references: [id])
+  staffId        String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  tenantId       String
+  startTime      DateTime
+  endTime        DateTime
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId   String
+  orderId    String?
+  targetRole String
+  targetUserId String?
+  message    String
+  type       String   @default("OrderUpdate")
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId    String
+  name        String
+  email       String
+  phone       String
+  totalOrders Int      @default(0)
+  totalSpend  Decimal  @default(0)
+  lastVisit   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  orders      Order[]
+}
